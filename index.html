@@ -1,0 +1,225 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Spider-Sense 反應測試</title>
+<style>
+
+    body, html {
+
+      margin: 0; padding: 0; width: 100%; height: 100%;
+
+      font-family: Arial, sans-serif; display: flex;
+
+      justify-content: center; align-items: center;
+
+      text-align: center; color: white; user-select: none;
+
+    }
+
+    .screen { display: none; width: 100%; height: 100%; flex-direction: column; justify-content: center; align-items: center; }
+
+    .active { display: flex; }
+
+    /* 畫面 1：準備畫面 (第一幅圖背景) */
+
+    #start-screen { background-color: #1a1a1a; }
+
+    input { padding: 12px; font-size: 18px; margin: 15px; border-radius: 5px; border: none; text-align: center; }
+
+    button { padding: 12px 24px; font-size: 18px; background: #e50914; color: white; border: none; border-radius: 5px; cursor: pointer; }
+
+    /* 畫面 2：等待畫面 (第二幅圖紅色) */
+
+    #red-screen { background-color: #d32f2f; cursor: pointer; }
+
+    /* 畫面 3：按壓畫面 (第三幅圖綠色) */
+
+    #green-screen { background-color: #388e3c; cursor: pointer; }
+
+    /* 畫面 4：結果畫面 */
+
+    #result-screen { background-color: #1a1a1a; }
+
+    /* 畫面 5：搶答過早畫面 (同畫面 1 一樣背景及字體) */
+
+    #early-screen { background-color: #1a1a1a; }
+
+    .sensory-overload { font-size: 42px; font-weight: bold; color: #ffffff; letter-spacing: 2px; margin-bottom: 20px; }
+</style>
+</head>
+<body>
+<!-- 畫面 1：登入畫面 -->
+<div id="start-screen" class="screen active">
+<h1>Spider-Sense 反應測試</h1>
+<p>請輸入特工編號以開始測試</p>
+<input type="text" id="agent-id" placeholder="特工編號">
+<button onclick="startGame()">開始測試</button>
+</div>
+<!-- 畫面 2：等待綠燈 (紅色畫面) -->
+<div id="red-screen" class="screen" onclick="triggerEarly()">
+<h1>準備...</h1>
+<p>當畫面轉為綠色時，請立刻點擊螢幕</p>
+</div>
+<!-- 畫面 3：反應點擊 (綠色畫面) -->
+<div id="green-screen" class="screen" onclick="recordReaction()">
+<h1>按壓！</h1>
+</div>
+<!-- 畫面 4：結果顯示 -->
+<div id="result-screen" class="screen">
+<h1 id="time-display">0 ms</h1>
+<h2 id="status-display"></h2>
+<p id="sync-status"></p>
+<button onclick="resetToRed()">再次測試</button>
+</div>
+<!-- 畫面 5：過早點擊 (Sensory Overload，不計入紀錄) -->
+<div id="early-screen" class="screen">
+<div class="sensory-overload">Sensory Overload</div>
+<button onclick="resetToRed()">重新嘗試</button>
+</div>
+<script>
+
+    // 請將下方字串替換為你喺 Google Apps Script 部署獲得嘅 Web App URL
+
+    const SCRIPT_URL = "https://script.google.com/macros/s/AKfycbzxpknNQSomgQ8NJyy1KcwrZUsfwHxbEYf0SrpP8L30q4GyGRizqBX4oEfLXBOvlgAG/exec";
+
+    let agentId = "";
+
+    let startTime = 0;
+
+    let timer = null;
+
+    let playCount = 0;
+
+    function showScreen(id) {
+
+      document.querySelectorAll('.screen').forEach(s => s.classList.remove('active'));
+
+      document.getElementById(id).classList.add('active');
+
+    }
+
+    function startGame() {
+
+      agentId = document.getElementById('agent-id').value.trim();
+
+      if (!agentId) {
+
+        alert("請輸入特工編號！");
+
+        return;
+
+      }
+
+      resetToRed();
+
+    }
+
+    function resetToRed() {
+
+      showScreen('red-screen');
+
+      // 隨機等待 2 至 5 秒後轉成綠色
+
+      const delay = Math.floor(Math.random() * 3000) + 2000;
+
+      timer = setTimeout(() => {
+
+        showScreen('green-screen');
+
+        startTime = Date.now();
+
+      }, delay);
+
+    }
+
+    function triggerEarly() {
+
+      // 搶答過早，取消計時，跳至 Sensory Overload 畫面（不計入 3 次紀錄）
+
+      clearTimeout(timer);
+
+      showScreen('early-screen');
+
+    }
+
+    function recordReaction() {
+
+      const reactionTime = Date.now() - startTime;
+
+      document.getElementById('time-display').innerText = reactionTime + " ms";
+
+      // 結果判定邏輯
+
+      let statusText = "";
+
+      if (reactionTime < 290) {
+
+        statusText = "Spider-sense 超水平";
+
+      } else if (reactionTime <= 340) { // 290 - 340 ms
+
+        statusText = "Spider-sense 回復水平";
+
+      } else { // 大過 340 ms
+
+        statusText = "Spider-sense still out of Control";
+
+      }
+
+      document.getElementById('status-display').innerText = statusText;
+
+      showScreen('result-screen');
+
+      uploadData(reactionTime);
+
+    }
+
+    function uploadData(reactionTime) {
+
+      const syncStatus = document.getElementById('sync-status');
+
+      // 本地測試次數防護
+
+      if (playCount >= 3) {
+
+        syncStatus.innerText = "已超過 3 次上傳上限，本次測試不會實時連接到系統。";
+
+        return;
+
+      }
+
+      syncStatus.innerText = "資料同步中...";
+
+      fetch(SCRIPT_URL, {
+
+        method: "POST",
+
+        mode: "no-cors",
+
+        headers: { "Content-Type": "application/json" },
+
+        body: JSON.stringify({ agentId: agentId, reactionTime: reactionTime })
+
+      })
+
+      .then(() => {
+
+        playCount++;
+
+        syncStatus.innerText = `紀錄已實時上傳至系統 (第 ${playCount}/3 次)`;
+
+      })
+
+      .catch(() => {
+
+        syncStatus.innerText = "同步失敗，請檢查網路。";
+
+      });
+
+    }
+</script>
+</body>
+</html>
+ 
